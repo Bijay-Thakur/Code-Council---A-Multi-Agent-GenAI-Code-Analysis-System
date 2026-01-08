@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { AgentOutputCard } from './AgentOutputCard';
+import { useAnalysis } from '../contexts/AnalysisContext';
 
 interface AgentTabsProps {
   activeTab: string;
@@ -16,6 +17,52 @@ const tabs = [
 ];
 
 export function AgentTabs({ activeTab, onTabChange, isAnalyzing }: AgentTabsProps) {
+  const { results } = useAnalysis();
+
+  // Get content for the active tab based on analysis results
+  const getContentForTab = (tabId: string): string | undefined => {
+    if (!results) return undefined;
+
+    switch (tabId) {
+      case 'explainer':
+        // New format: structured, old format: text
+        if ('text' in (results.explainer || {})) {
+          return (results.explainer as any).text;
+        }
+        return undefined; // New format is handled by ExplainerAgentPage
+      case 'bug-hunter':
+        // New format: structured, old format: text
+        if ('text' in (results.bugHunter || {})) {
+          return (results.bugHunter as any).text;
+        }
+        return undefined; // New format is handled by BugHunterAgentPage
+      case 'complexity':
+        // New format: structured, old format: text
+        const complexity = results.complexity;
+        if (complexity && 'text' in complexity) {
+          return `Time Complexity: ${complexity.time}\nSpace Complexity: ${complexity.space}\n\n${complexity.text}`;
+        }
+        return undefined; // New format is handled by ComplexityAgentPage
+      case 'debate':
+        // Debate is handled by DebatePanel component, not AgentOutputCard
+        return undefined;
+      case 'refined':
+        // New format: finalSummary, old format: final
+        if (results.supervisor) {
+          if ('finalSummary' in results.supervisor) {
+            return results.supervisor.finalSummary;
+          }
+          if ('final' in results.supervisor) {
+            return (results.supervisor as any).final;
+          }
+        }
+        return undefined;
+      default:
+        return undefined;
+    }
+  };
+
+  const content = getContentForTab(activeTab);
   return (
     <div className="space-y-6">
       {/* Tab navigation */}
@@ -77,6 +124,7 @@ export function AgentTabs({ activeTab, onTabChange, isAnalyzing }: AgentTabsProp
         agentName={tabs.find(t => t.id === activeTab)?.label || ''}
         agentColor={tabs.find(t => t.id === activeTab)?.color || '#4DFFFF'}
         isAnalyzing={isAnalyzing}
+        content={content}
       />
     </div>
   );

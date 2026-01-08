@@ -1,10 +1,104 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, X, Send, Mic } from 'lucide-react';
+import { API_BASE_URL } from '../config/api';
+
+interface ChatMessage {
+  id: string;
+  text: string;
+  isBot: boolean;
+  timestamp: Date;
+}
 
 export function FloatingChat() {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState('');
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: 'welcome-1',
+      text: "Hello! I'm your Code Council assistant. I can help you understand the multi-agent analysis, explain results, or answer questions about your code.",
+      isBot: true,
+      timestamp: new Date(),
+    }
+  ]);
+  const [isTyping, setIsTyping] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      scrollToBottom();
+    }
+  }, [messages, isTyping, isOpen]);
+
+  const handleSend = async () => {
+    if (!message.trim() || isTyping) {
+      return;
+    }
+
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      text: message,
+      isBot: false,
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    const messageToSend = message;
+    setMessage('');
+    setIsTyping(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: messageToSend,
+          history: messages
+            .filter(msg => msg.id !== 'welcome-1')
+            .map((msg) => ({
+              role: msg.isBot ? 'assistant' : 'user',
+              content: msg.text,
+            })),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      const botMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        text: data.reply || "I'm sorry, I couldn't generate a response.",
+        isBot: true,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, botMessage]);
+      setIsTyping(false);
+    } catch (error) {
+      console.error('[FloatingChat] Error:', error);
+      const errorMessage: ChatMessage = {
+        id: (Date.now() + 2).toString(),
+        text: "I'm sorry, something went wrong connecting to the AI backend.",
+        isBot: true,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+      setIsTyping(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
 
   return (
     <>
@@ -86,52 +180,59 @@ export function FloatingChat() {
 
               {/* Messages area */}
               <div className="flex-1 py-4 space-y-4 overflow-y-auto">
-                {/* AI message */}
-                <div className="flex gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-[#4DFFFF] to-[#9A4DFF] flex items-center justify-center flex-shrink-0">
-                    <span className="text-white text-xs" style={{ fontFamily: 'Inter, sans-serif', fontWeight: '600' }}>
-                      AI
-                    </span>
+                {messages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex gap-3 ${msg.isBot ? '' : 'justify-end'}`}
+                  >
+                    {msg.isBot && (
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-r from-[#4DFFFF] to-[#9A4DFF] flex items-center justify-center flex-shrink-0">
+                        <span className="text-white text-xs" style={{ fontFamily: 'Inter, sans-serif', fontWeight: '600' }}>
+                          AI
+                        </span>
+                      </div>
+                    )}
+                    <div className={`flex-1 ${msg.isBot ? '' : 'max-w-[80%]'}`}>
+                      <div
+                        className={`px-4 py-3 rounded-2xl backdrop-blur-xl border ${
+                          msg.isBot
+                            ? 'rounded-tl-sm bg-white/10 border-white/10'
+                            : 'rounded-tr-sm bg-gradient-to-r from-[#4DFFFF]/20 to-[#9A4DFF]/20 border-white/20 ml-auto'
+                        }`}
+                      >
+                        <p className="text-sm text-white/90 whitespace-pre-wrap" style={{ fontFamily: 'Inter, sans-serif', lineHeight: '1.5' }}>
+                          {msg.text}
+                        </p>
+                      </div>
+                    </div>
+                    {!msg.isBot && (
+                      <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
+                        <span className="text-white text-xs" style={{ fontFamily: 'Inter, sans-serif', fontWeight: '600' }}>
+                          U
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex-1">
-                    <div className="px-4 py-3 rounded-2xl rounded-tl-sm backdrop-blur-xl bg-white/10 border border-white/10">
-                      <p className="text-sm text-white/90" style={{ fontFamily: 'Inter, sans-serif', lineHeight: '1.5' }}>
-                        Hello! I'm your Code Council assistant. I can help you understand the multi-agent analysis, explain results, or answer questions about your code.
-                      </p>
+                ))}
+                {isTyping && (
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-[#4DFFFF] to-[#9A4DFF] flex items-center justify-center flex-shrink-0">
+                      <span className="text-white text-xs" style={{ fontFamily: 'Inter, sans-serif', fontWeight: '600' }}>
+                        AI
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="px-4 py-3 rounded-2xl rounded-tl-sm backdrop-blur-xl bg-white/10 border border-white/10">
+                        <div className="flex gap-1">
+                          <div className="w-2 h-2 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <div className="w-2 h-2 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <div className="w-2 h-2 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-
-                {/* User message example */}
-                <div className="flex gap-3 justify-end">
-                  <div className="flex-1 max-w-[80%]">
-                    <div className="px-4 py-3 rounded-2xl rounded-tr-sm backdrop-blur-xl bg-gradient-to-r from-[#4DFFFF]/20 to-[#9A4DFF]/20 border border-white/20 ml-auto">
-                      <p className="text-sm text-white/90" style={{ fontFamily: 'Inter, sans-serif', lineHeight: '1.5' }}>
-                        What's the best way to optimize recursive functions?
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* AI response */}
-                <div className="flex gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-[#4DFFFF] to-[#9A4DFF] flex items-center justify-center flex-shrink-0">
-                    <span className="text-white text-xs" style={{ fontFamily: 'Inter, sans-serif', fontWeight: '600' }}>
-                      AI
-                    </span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="px-4 py-3 rounded-2xl rounded-tl-sm backdrop-blur-xl bg-white/10 border border-white/10">
-                      <p className="text-sm text-white/90" style={{ fontFamily: 'Inter, sans-serif', lineHeight: '1.5' }}>
-                        Great question! The main techniques are:
-                        <br />• Memoization (caching results)
-                        <br />• Dynamic programming
-                        <br />• Tail call optimization
-                        <br />• Converting to iterative approach
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                )}
+                <div ref={messagesEndRef} />
               </div>
 
               {/* Input area */}
@@ -142,6 +243,7 @@ export function FloatingChat() {
                       type="text"
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
+                      onKeyDown={handleKeyPress}
                       placeholder="Type your message..."
                       className="w-full px-4 py-3 rounded-xl backdrop-blur-xl bg-white/5 border border-white/10 text-white placeholder-white/40 outline-none focus:border-[#4DFFFF]/50 transition-all"
                       style={{ fontFamily: 'Inter, sans-serif', fontSize: '14px' }}
@@ -149,17 +251,11 @@ export function FloatingChat() {
                   </div>
 
                   <motion.button
+                    onClick={handleSend}
+                    disabled={!message.trim() || isTyping}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className="p-3 rounded-xl backdrop-blur-xl bg-white/5 border border-white/10 hover:border-[#4DFFFF]/50 transition-all group"
-                  >
-                    <Mic className="w-5 h-5 text-white/70 group-hover:text-[#4DFFFF] transition-colors" strokeWidth={2} />
-                  </motion.button>
-
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="relative group"
+                    className="relative group disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-[#4DFFFF] to-[#9A4DFF] rounded-xl blur-lg opacity-50 group-hover:opacity-70 transition-opacity" />
                     <div className="relative p-3 rounded-xl bg-gradient-to-r from-[#4DFFFF] to-[#9A4DFF] border border-white/20">

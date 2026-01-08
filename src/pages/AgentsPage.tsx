@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Lightbulb, Bug, BarChart3, MessageSquare, CheckCircle2 } from 'lucide-react';
+import { Lightbulb, Bug, BarChart3, MessageSquare, CheckCircle2, Network } from 'lucide-react';
 
 interface Agent {
   id: string;
@@ -14,10 +14,20 @@ interface Agent {
 
 const agents: Agent[] = [
   {
+    id: 'orchestrator',
+    name: 'Orchestrator Agent',
+    role: 'Workflow Coordination & Routing',
+    model: 'gpt-4o-mini',
+    version: 'v1.0',
+    description: 'Coordinates the multi-agent analysis workflow. Creates execution plans, routes tasks to specialized agents, and manages the overall analysis pipeline with comprehensive logging.',
+    icon: Network,
+    color: '#00D4FF'
+  },
+  {
     id: 'explainer',
     name: 'Explainer Agent',
     role: 'Code Simplification & Explanation',
-    model: 'gpt-4o-mini',
+    model: 'gemini-1.5-flash / gpt-4o-mini',
     version: 'v1.0',
     description: 'Helps simplify and explain code in clear, understandable terms. Breaks down complex logic and makes code accessible to developers of all levels.',
     icon: Lightbulb,
@@ -47,7 +57,7 @@ const agents: Agent[] = [
     id: 'debate',
     name: 'Debate Agent',
     role: 'Argument & Counterargument',
-    model: 'gpt-4o-mini',
+    model: 'gemini-1.5-flash / gpt-4o-mini',
     version: 'v1.0',
     description: 'Conducts argument and counterargument rounds to challenge assumptions and improve code quality through rigorous debate.',
     icon: MessageSquare,

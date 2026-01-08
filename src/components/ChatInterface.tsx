@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Send, ArrowLeft, Bot, User } from 'lucide-react';
 import { TypingIndicator } from './TypingIndicator';
 import { Message } from './Message';
+import { API_BASE_URL } from '../config/api';
 
 interface ChatInterfaceProps {
   onBack: () => void;
@@ -15,24 +16,18 @@ interface MessageType {
   timestamp: Date;
 }
 
-const BOT_RESPONSES = [
-  "Hello! I'm NEXUS AI, your intelligent assistant. How can I help you today?",
-  "That's a great question! Let me help you with that.",
-  "I understand. Here's what I think about that...",
-  "Interesting! I'd be happy to explore this topic with you.",
-  "Based on my analysis, I would suggest...",
-  "I'm here to help! Could you tell me more?",
-];
+
 
 export function ChatInterface({ onBack }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<MessageType[]>([
     {
-      id: '1',
-      text: "Welcome to NEXUS AI! I'm here to assist you with anything you need. How can I help you today?",
+      id: 'welcome-1',
+      text: "Welcome to Code Council! I'm here to assist you with anything you need. How can I help you today?",
       isBot: true,
       timestamp: new Date(),
     },
   ]);
+
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -45,34 +40,76 @@ export function ChatInterface({ onBack }: ChatInterfaceProps) {
     scrollToBottom();
   }, [messages, isTyping]);
 
-  const handleSend = async () => {
-    if (!inputValue.trim() || isTyping) return;
+// HANDLE SEND -> SEND USER MESSAGE TO BACKEND
 
+  const handleSend = async () => {
+    if (!inputValue.trim() || isTyping) {
+      console.log('[frontend] Chat send blocked:', { hasInput: !!inputValue.trim(), isTyping });
+      return;
+    }
+
+    console.log('[frontend] Sending chat message:', inputValue);
     const userMessage: MessageType = {
       id: Date.now().toString(),
       text: inputValue,
       isBot: false,
       timestamp: new Date(),
     };
-
+    
+    // Add user message to UI immediately
     setMessages((prev) => [...prev, userMessage]);
+    const messageToSend = inputValue;
     setInputValue('');
     setIsTyping(true);
 
-    // Simulate bot response
-    setTimeout(() => {
+    // Call backend API
+    try {
+      console.log('[frontend] Sending message to backend...');
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: messageToSend,
+          history: messages
+            .filter(msg => msg.id !== 'welcome-1') // Exclude welcome message from history
+            .map((msg) => ({
+              role: msg.isBot ? 'assistant' : 'user',
+              content: msg.text,
+            })),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('[frontend] Received response from backend');
+      
       const botMessage: MessageType = {
         id: (Date.now() + 1).toString(),
-        text: BOT_RESPONSES[Math.floor(Math.random() * BOT_RESPONSES.length)],
+        text: data.reply,
         isBot: true,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, botMessage]);
       setIsTyping(false);
-    }, 1500 + Math.random() * 1000);
+    } catch(error) {
+      console.error('[frontend] Error:', error);
+
+      const errorMessage: MessageType = {
+        id: (Date.now() + 2).toString(),
+        text: "I'm sorry, something went wrong connecting to the AI backend.",
+        isBot: true,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+      setIsTyping(false);
+    }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -149,7 +186,7 @@ export function ChatInterface({ onBack }: ChatInterfaceProps) {
                 type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyDown={handleKeyPress}
                 placeholder="Type your message..."
                 className="w-full px-6 py-4 rounded-2xl backdrop-blur-xl bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-white/30 transition-all"
               />
