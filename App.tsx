@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './src/contexts/ThemeContext';
+import { AnalysisProvider } from './src/contexts/AnalysisContext';
 import { TopNav } from './src/components/TopNav';
 import { Sidebar } from './src/components/Sidebar';
 import { FloatingChat } from './src/components/FloatingChat';
@@ -17,10 +18,11 @@ import { AgentsPage } from './src/pages/AgentsPage';
 export default function App() {
   return (
     <ThemeProvider>
-      <BrowserRouter>
+      <AnalysisProvider>
+        <BrowserRouter>
         <div className="min-h-screen overflow-hidden relative transition-colors duration-300">
-          {/* Animated gradient background */}
-          <div className="fixed inset-0 bg-gradient-to-br from-[#0A0F2C] via-[#111A44] to-[#0A0F2C] transition-colors duration-300">
+          {/* Animated gradient background - theme aware */}
+          <div className="fixed inset-0 bg-gradient-to-br from-[#0A0F2C] via-[#111A44] to-[#0A0F2C] dark:from-[#0A0F2C] dark:via-[#111A44] dark:to-[#0A0F2C] light:from-[#F0F4F8] light:via-[#E8EDF3] light:to-[#F0F4F8] transition-colors duration-300">
             {/* Animated orbs */}
             <div className="absolute top-20 left-20 w-[600px] h-[600px] bg-[#4DFFFF]/10 rounded-full blur-[120px] animate-pulse" />
             <div className="absolute bottom-20 right-20 w-[500px] h-[500px] bg-[#9A4DFF]/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }} />
@@ -64,7 +66,8 @@ export default function App() {
 
         <FloatingChat />
       </div>
-      </BrowserRouter>
+        </BrowserRouter>
+      </AnalysisProvider>
     </ThemeProvider>
   );
 }

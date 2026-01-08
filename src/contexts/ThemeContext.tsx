@@ -16,8 +16,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
-    document.documentElement.classList.toggle('light', theme === 'light');
-    document.documentElement.classList.toggle('dark', theme === 'dark');
+    // Remove both classes first
+    document.documentElement.classList.remove('light', 'dark');
+    // Add the current theme class
+    document.documentElement.classList.add(theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
 
