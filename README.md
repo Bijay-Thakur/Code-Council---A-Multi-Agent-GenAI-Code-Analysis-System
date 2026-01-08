@@ -472,7 +472,8 @@ Synthesizes all agent outputs into final verdict.
 
 - **Node.js** 18+ and npm
 - **Git** for version control
-- **OpenAI API Key** (for backend integration)
+- **OpenAI API Key** (recommended for full functionality)
+- **Google Gemini API Key** (optional, enables multi-model routing)
 
 ### Quick Start
 
@@ -483,14 +484,52 @@ git clone https://github.com/yourusername/Code_Council.git
 # Navigate to project directory
 cd Code_Council
 
-# Install dependencies
+# Install dependencies (root and backend)
 npm install
+cd backend && npm install && cd ..
 
-# Start development server
-npm run dev
+# Start both frontend and backend simultaneously
+npm run dev:all
 ```
 
-The application will be available at `http://localhost:5173`
+The application will be available at:
+- **Frontend**: `http://localhost:5173` (Vite dev server)
+- **Backend**: `http://localhost:3000` (Express API server)
+
+### Running Servers Individually
+
+```bash
+# Frontend only
+npm run dev
+# or
+npm run dev:frontend
+
+# Backend only
+npm run dev:backend
+```
+
+### How to Run Everything
+
+To run both frontend and backend from the repository root:
+
+1. **Install all dependencies:**
+   ```bash
+   npm install              # Install root dependencies (includes concurrently, wait-on)
+   cd backend && npm install && cd ..  # Install backend dependencies
+   ```
+
+2. **Start both servers:**
+   ```bash
+   npm run dev:all
+   ```
+
+This command will:
+- Start the backend Express server on port 3000
+- Wait for the backend to be ready
+- Start the frontend Vite dev server on port 5173
+- Display logs from both servers with color-coded prefixes: `[backend]` and `[frontend]`
+
+The frontend is configured to use `http://localhost:3000` as the API base URL (defined in `src/config/api.ts`).
 
 ### Build for Production
 
@@ -506,20 +545,21 @@ npm run preview
 
 ## 🔧 Environment Variables
 
-Create a `.env` file in the root directory:
+Create a `.env` file in the `backend/` directory (NOT the root):
 
 ```env
-# OpenAI API Configuration
-VITE_OPENAI_API_KEY=your_openai_api_key_here
+# OpenAI API Configuration (Required for full functionality)
+OPENAI_API_KEY=your_openai_api_key_here
 
-# Backend API URL (for production)
-VITE_BACKEND_URL=http://localhost:3000
-
-# Optional: Environment
-VITE_ENV=development
+# Google Gemini API Configuration (Optional - used for Explainer and Debate agents)
+GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
-**⚠️ Important:** Never commit your `.env` file to version control. It's already included in `.gitignore`.
+**⚠️ Important:** 
+- API keys MUST be in `backend/.env` (not root)
+- Never commit your `.env` file to version control. It's already included in `.gitignore`.
+- The application will work with stub responses if API keys are missing, but full AI functionality requires at least `OPENAI_API_KEY`.
+- For best results, provide both `OPENAI_API_KEY` and `GEMINI_API_KEY` to enable multi-model routing.
 
 ---
 
