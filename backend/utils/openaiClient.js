@@ -22,7 +22,7 @@ export const openai = apiKey ? new OpenAI({
   apiKey: apiKey,
 }) : null;
 
-export async function generateOpenAIResponse(modelName, messages, systemPrompt = null, forceJSON = false) {
+export async function generateOpenAIResponse(modelName, messages, systemPrompt = null, forceJSON = false, temperature = null) {
   if (!openai) {
     return null;
   }
@@ -32,11 +32,22 @@ export async function generateOpenAIResponse(modelName, messages, systemPrompt =
       ? [{ role: 'system', content: systemPrompt }, ...messages]
       : messages;
 
-    const completion = await openai.chat.completions.create({
+    const requestOptions = {
       model: modelName,
       messages: messageArray,
-      response_format: forceJSON ? { type: 'json_object' } : undefined
-    });
+    };
+
+    if (forceJSON) {
+      requestOptions.response_format = { type: 'json_object' };
+    }
+
+    // Set temperature for deterministic output (lower = more deterministic)
+    // Default: 0.7 for most, 0.2 for complexity (more deterministic)
+    if (temperature !== null) {
+      requestOptions.temperature = temperature;
+    }
+
+    const completion = await openai.chat.completions.create(requestOptions);
 
     return completion.choices[0].message.content;
   } catch (error) {

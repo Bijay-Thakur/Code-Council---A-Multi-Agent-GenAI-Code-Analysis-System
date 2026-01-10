@@ -1,12 +1,9 @@
-// Agent to model mapping configuration
+// Agent to model mapping configuration - All using OpenAI
 export const agentModels = {
   explainer: {
-    primary: 'gemini-1.5-flash',
-    provider: 'gemini',
-    fallback: {
-      model: 'gpt-4o-mini',
-      provider: 'openai'
-    }
+    primary: 'gpt-4o-mini',
+    provider: 'openai',
+    fallback: null
   },
   bugHunter: {
     primary: 'gpt-4o-mini',
@@ -19,8 +16,8 @@ export const agentModels = {
     fallback: null
   },
   debate: {
-    primary: 'gemini-1.5-flash',
-    provider: 'gemini',
+    primary: 'gpt-4o', // Different model for debate as requested
+    provider: 'openai',
     fallback: {
       model: 'gpt-4o-mini',
       provider: 'openai'

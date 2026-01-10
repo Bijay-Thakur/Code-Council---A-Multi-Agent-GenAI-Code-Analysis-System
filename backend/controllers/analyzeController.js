@@ -1,5 +1,4 @@
 import { generateOpenAIResponse } from '../utils/openaiClient.js';
-import { generateGeminiResponse } from '../utils/geminiClient.js';
 import { getAgentModel } from '../utils/modelHelper.js';
 import { 
   explainerPrompt, 
@@ -10,6 +9,17 @@ import {
   extractJSON 
 } from '../prompts/agents.js';
 import { runStructuredDebate } from '../services/debateService.js';
+import {
+  validateAgentResponse,
+  ExplainerSchema,
+  BugHunterSchema,
+  ComplexitySchema,
+  FinalVerdictSchema,
+  createFallbackExplainer,
+  createFallbackBugHunter,
+  createFallbackComplexity,
+  createFallbackFinalVerdict
+} from '../schemas/agentSchemas.js';
 
 // Generate trace ID
 function generateTraceId() {
@@ -25,58 +35,15 @@ function addLog(logs, level, message) {
   });
 }
 
-// Stub responses for when API keys are missing
+// Stub responses for when API keys are missing (matching new schemas)
 const stubs = {
-  explainer: (code, language) => ({
-    title: 'Code Explanation',
-    summary: `This ${language} code appears to be a functional implementation.`,
-    whatItDoes: `This code implements a ${language} solution that processes data according to its logic.`,
-    inputOutput: {
-      input: 'Input parameters and data types expected by the code',
-      output: 'Output format and return values from the code'
-    },
-    stepByStep: [
-      { step: 1, text: 'Code structure follows standard patterns' },
-      { step: 2, text: 'Key components include function definitions and control flow' }
-    ],
-    keyConcepts: [
-      { name: 'Structure', explanation: 'Code follows standard patterns' }
-    ],
-    edgeCases: ['Consider edge case handling'],
-    exampleWalkthrough: 'Code executes step by step as designed'
-  }),
+  explainer: (code, language) => createFallbackExplainer(),
   
-  bugHunter: (code, language) => ({
-    overallRisk: 'low',
-    bugCount: 0,
-    statusMessage: 'Well done! No bugs found.',
-    findings: [],
-    suggestions: ['Consider adding error handling', 'Consider adding input validation'],
-    quickFixes: []
-  }),
+  bugHunter: (code, language) => createFallbackBugHunter(),
   
-  complexity: (code, language) => ({
-    time: 'O(n)',
-    space: 'O(1)',
-    dominantOperations: ['Iteration', 'Conditional checks'],
-    notes: ['Time complexity is typically O(n)', 'Space complexity is O(1) for most operations'],
-    improvements: ['Consider optimization for larger inputs']
-  }),
+  complexity: (code, language) => createFallbackComplexity(),
   
-  supervisor: (code, language) => ({
-    finalSummary: 'Analysis complete. The code demonstrates good structure with room for minor improvements.',
-    actionItems: [
-      'Add comprehensive error handling',
-      'Consider performance optimizations',
-      'Improve code documentation'
-    ],
-    riskLevel: 'low',
-    optimizedCode: {
-      language: language || 'javascript',
-      code: code || '// No code provided', // Fallback: return original code
-      whyBetter: ['Original code maintained as baseline', 'Consider adding error handling', 'Consider adding input validation']
-    }
-  }),
+  supervisor: (code, language) => createFallbackFinalVerdict(language, code),
   
   orchestrator: (code, language) => ({
     plan: `Analyzing ${language} code with multi-agent system. Will run Explainer, BugHunter, and Complexity agents in parallel, then conduct debate rounds, and finally synthesize results with Supervisor.`,
@@ -94,10 +61,11 @@ async function runOrchestrator(code, language, logs) {
     const { prompt, systemPrompt } = orchestratorPrompt(code, language);
     
     let response;
-    if (modelConfig.provider === 'gemini') {
-      response = await generateGeminiResponse(modelConfig.model, prompt, systemPrompt);
-    } else {
+    try {
       response = await generateOpenAIResponse(modelConfig.model, [{ role: 'user', content: prompt }], systemPrompt, true);
+    } catch (error) {
+      addLog(logs, 'error', `Orchestrator API error: ${error.message}`);
+      response = null;
     }
     
     if (response) {
@@ -113,7 +81,7 @@ async function runOrchestrator(code, language, logs) {
   return stubs.orchestrator(code, language);
 }
 
-// Explainer agent
+// Explainer agent with zod validation
 async function runExplainer(code, language, logs) {
   addLog(logs, 'info', 'Explainer: Starting analysis');
   const modelConfig = getAgentModel('explainer');
@@ -122,34 +90,53 @@ async function runExplainer(code, language, logs) {
     const { prompt, systemPrompt } = explainerPrompt(code, language);
     
     let response;
-    if (modelConfig.provider === 'gemini') {
-      response = await generateGeminiResponse(modelConfig.model, prompt, systemPrompt);
-    } else {
+    try {
       response = await generateOpenAIResponse(modelConfig.model, [{ role: 'user', content: prompt }], systemPrompt, true);
+    } catch (error) {
+      addLog(logs, 'error', `Explainer API error: ${error.message}`);
+      response = null;
     }
     
     if (response) {
-      const parsed = extractJSON(response);
-      if (parsed && parsed.title && parsed.summary) {
-        addLog(logs, 'info', 'Explainer: Analysis complete');
-        // Ensure whatItDoes and inputOutput are present
-        return {
-          ...parsed,
-          whatItDoes: parsed.whatItDoes || parsed.summary,
-          inputOutput: parsed.inputOutput || {
-            input: 'No input specified',
-            output: 'No output specified'
-          }
-        };
+      // Log first 300 chars of response for debugging
+      addLog(logs, 'info', `Explainer: Received response (${response.length} chars), preview: ${response.substring(0, 300).replace(/\n/g, ' ')}...`);
+      
+      // Validate with zod schema
+      const validation = validateAgentResponse(response, ExplainerSchema, createFallbackExplainer);
+      
+      // Check if we got real data (not just fallback)
+      const isFallback = validation.data && (
+        validation.data.overview === 'Unable to parse explainer response' ||
+        validation.data.overview === 'Code analysis is being processed. Please wait or check system logs.'
+      );
+      
+      if (validation.valid && !isFallback) {
+        addLog(logs, 'info', `Explainer: Analysis complete (validated) - overview: ${validation.data.overview?.substring(0, 60) || 'N/A'}...`);
+        return validation.data;
+      } else if (!isFallback || (validation.data && validation.data.overview && validation.data.overview !== 'Code analysis is being processed. Please wait or check system logs.')) {
+        // Partial validation succeeded - we have some real data
+        addLog(logs, 'warn', `Explainer: Partial validation - ${validation.errors?.length || 0} error(s), but using available data`);
+        addLog(logs, 'info', `Explainer: Using data with overview: ${validation.data?.overview?.substring(0, 60) || 'N/A'}...`);
+        return validation.data;
+      } else {
+        // Complete fallback - validation failed completely, but still return something
+        addLog(logs, 'error', `Explainer: Validation completely failed - ${validation.errors?.slice(0, 3).join('; ') || 'Unknown error'}`);
+        if (process.env.NODE_ENV !== 'production' && validation.rawText) {
+          addLog(logs, 'error', `Explainer: Raw LLM output (first 1000 chars): ${validation.rawText.substring(0, 1000)}`);
+        }
+        // Still return the validation.data (which is fallback) so the system doesn't break
+        return validation.data;
       }
+    } else {
+      addLog(logs, 'warn', 'Explainer: No response received from API');
     }
   }
   
-  addLog(logs, 'warn', 'Explainer: Using stub (no API key)');
+  addLog(logs, 'warn', 'Explainer: Using stub (no API key or no response)');
   return stubs.explainer(code, language);
 }
 
-// Bug Hunter agent
+// Bug Hunter agent with zod validation
 async function runBugHunter(code, language, logs) {
   addLog(logs, 'info', 'BugHunter: Starting analysis');
   const modelConfig = getAgentModel('bugHunter');
@@ -158,28 +145,22 @@ async function runBugHunter(code, language, logs) {
     const { prompt, systemPrompt } = bugHunterPrompt(code, language);
     
     let response;
-    if (modelConfig.provider === 'gemini') {
-      response = await generateGeminiResponse(modelConfig.model, prompt, systemPrompt);
-    } else {
+    try {
       response = await generateOpenAIResponse(modelConfig.model, [{ role: 'user', content: prompt }], systemPrompt, true);
+    } catch (error) {
+      addLog(logs, 'error', `BugHunter API error: ${error.message}`);
+      response = null;
     }
     
     if (response) {
-      const parsed = extractJSON(response);
-      if (parsed && parsed.overallRisk && Array.isArray(parsed.findings)) {
-        addLog(logs, 'info', 'BugHunter: Analysis complete');
-        // Ensure bugCount and statusMessage are set
-        const bugCount = parsed.bugCount ?? parsed.findings.length;
-        const statusMessage = parsed.statusMessage || 
-          (bugCount === 0 
-            ? 'Well done! No bugs found.' 
-            : `${bugCount} bug(s) found that need attention.`);
-        return {
-          ...parsed,
-          bugCount,
-          statusMessage,
-          suggestions: parsed.suggestions || []
-        };
+      // Validate with zod schema
+      const validation = validateAgentResponse(response, BugHunterSchema, createFallbackBugHunter);
+      if (validation.valid) {
+        addLog(logs, 'info', 'BugHunter: Analysis complete (validated)');
+        return validation.data;
+      } else {
+        addLog(logs, 'warn', `BugHunter validation errors: ${validation.errors.join(', ')}`);
+        return validation.data;
       }
     }
   }
@@ -188,7 +169,7 @@ async function runBugHunter(code, language, logs) {
   return stubs.bugHunter(code, language);
 }
 
-// Complexity agent
+// Complexity agent with zod validation
 async function runComplexity(code, language, logs) {
   addLog(logs, 'info', 'Complexity: Starting analysis');
   const modelConfig = getAgentModel('complexity');
@@ -197,17 +178,23 @@ async function runComplexity(code, language, logs) {
     const { prompt, systemPrompt } = complexityPrompt(code, language);
     
     let response;
-    if (modelConfig.provider === 'gemini') {
-      response = await generateGeminiResponse(modelConfig.model, prompt, systemPrompt);
-    } else {
-      response = await generateOpenAIResponse(modelConfig.model, [{ role: 'user', content: prompt }], systemPrompt, true);
+    try {
+      // Use lower temperature (0.2) for more deterministic complexity analysis
+      response = await generateOpenAIResponse(modelConfig.model, [{ role: 'user', content: prompt }], systemPrompt, true, 0.2);
+    } catch (error) {
+      addLog(logs, 'error', `Complexity API error: ${error.message}`);
+      response = null;
     }
     
     if (response) {
-      const parsed = extractJSON(response);
-      if (parsed && parsed.time && parsed.space) {
-        addLog(logs, 'info', 'Complexity: Analysis complete');
-        return parsed;
+      // Validate with zod schema
+      const validation = validateAgentResponse(response, ComplexitySchema, createFallbackComplexity);
+      if (validation.valid) {
+        addLog(logs, 'info', 'Complexity: Analysis complete (validated)');
+        return validation.data;
+      } else {
+        addLog(logs, 'warn', `Complexity validation errors: ${validation.errors.join(', ')}`);
+        return validation.data;
       }
     }
   }
@@ -216,7 +203,7 @@ async function runComplexity(code, language, logs) {
   return stubs.complexity(code, language);
 }
 
-// Supervisor agent
+// Supervisor agent with zod validation
 async function runSupervisor(code, language, explainerResult, bugHunterResult, complexityResult, debateResult, logs) {
   addLog(logs, 'info', 'Supervisor: Synthesizing final verdict');
   const modelConfig = getAgentModel('supervisor');
@@ -225,27 +212,27 @@ async function runSupervisor(code, language, explainerResult, bugHunterResult, c
     const { prompt, systemPrompt } = supervisorPrompt(code, language, explainerResult, bugHunterResult, complexityResult, debateResult);
     
     let response;
-    if (modelConfig.provider === 'gemini') {
-      response = await generateGeminiResponse(modelConfig.model, prompt, systemPrompt);
-    } else {
+    try {
       response = await generateOpenAIResponse(modelConfig.model, [{ role: 'user', content: prompt }], systemPrompt, true);
+    } catch (error) {
+      addLog(logs, 'error', `Supervisor API error: ${error.message}`);
+      response = null;
     }
     
     if (response) {
-      const parsed = extractJSON(response);
-      if (parsed && parsed.finalSummary && parsed.optimizedCode) {
-        addLog(logs, 'info', 'Supervisor: Complete');
-        // Ensure all required fields are present
-        return {
-          finalSummary: parsed.finalSummary,
-          actionItems: Array.isArray(parsed.actionItems) ? parsed.actionItems : [],
-          riskLevel: parsed.riskLevel || 'low',
-          optimizedCode: {
-            language: parsed.optimizedCode?.language || language,
-            code: parsed.optimizedCode?.code || code,
-            whyBetter: Array.isArray(parsed.optimizedCode?.whyBetter) ? parsed.optimizedCode.whyBetter : ['Optimizations applied']
-          }
-        };
+      // Validate with zod schema
+      const validation = validateAgentResponse(response, FinalVerdictSchema, () => createFallbackFinalVerdict(language, code));
+      if (validation.valid) {
+        addLog(logs, 'info', 'Supervisor: Complete (validated)');
+        return validation.data;
+      } else {
+        addLog(logs, 'warn', `Supervisor validation errors: ${validation.errors.join(', ')}`);
+        // Ensure optimizedCode is present even if validation partially failed
+        const result = validation.data;
+        if (!result.optimizedCode || !result.optimizedCode.code) {
+          result.optimizedCode = { language, code };
+        }
+        return result;
       }
     }
   }
@@ -253,6 +240,7 @@ async function runSupervisor(code, language, explainerResult, bugHunterResult, c
   addLog(logs, 'warn', 'Supervisor: Using stub (no API key)');
   return stubs.supervisor(code, language);
 }
+
 
 export async function analyzeController(req, res) {
   const traceId = generateTraceId();
@@ -276,9 +264,6 @@ export async function analyzeController(req, res) {
     // Log the code being analyzed (first 200 chars for debugging)
     console.log(`[backend] Analyzing code (${code.length} chars, language: ${language}):`, code.substring(0, 200) + (code.length > 200 ? '...' : ''));
     addLog(logs, 'info', `Received code: ${code.length} characters, language: ${language}`);
-    
-    const debateRounds = options.debateRounds || 6;
-    addLog(logs, 'info', `Language: ${language}, Debate rounds: ${debateRounds}`);
     
     // Step 1: Orchestrator creates plan
     const orchestratorResult = await runOrchestrator(code, language, logs);
@@ -313,11 +298,14 @@ export async function analyzeController(req, res) {
       debateResult = await runStructuredDebate(explainerResult, bugHunterResult, complexityResult, logs, addLog);
     } catch (error) {
       addLog(logs, 'error', `Debate error: ${error.message}`);
-      // Use stub debate if real one fails
       debateResult = {
         topic: "Is this code production-ready? What should be improved first?",
         rounds: [],
-        judgeSummary: { winner: 'Explainer', reason: 'Debate service unavailable' }
+        consensus: {
+          isProductionReady: false,
+          topPriorities: [],
+          rationale: 'Debate service encountered an error'
+        }
       };
     }
     
@@ -332,7 +320,7 @@ export async function analyzeController(req, res) {
     
     addLog(logs, 'info', 'Analysis complete');
     
-    // Return exact structure as specified
+    // Return exact structure - using both 'supervisor' (for backward compat) and 'finalVerdict' (as per spec)
     return res.json({
       traceId,
       results: {
@@ -341,7 +329,8 @@ export async function analyzeController(req, res) {
         bugHunter: bugHunterResult,
         complexity: complexityResult,
         debate: debateResult,
-        supervisor: supervisorResult
+        supervisor: supervisorResult,  // Keep for backward compatibility
+        finalVerdict: supervisorResult  // New name as per spec
       },
       logs
     });

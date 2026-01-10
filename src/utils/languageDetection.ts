@@ -1,3 +1,77 @@
+// Map file extensions to languages
+const extensionToLanguage: Record<string, string> = {
+  // JavaScript/TypeScript
+  '.js': 'javascript',
+  '.jsx': 'javascript',
+  '.mjs': 'javascript',
+  '.ts': 'typescript',
+  '.tsx': 'typescript',
+  
+  // Python
+  '.py': 'python',
+  '.pyw': 'python',
+  '.pyi': 'python',
+  
+  // Java
+  '.java': 'java',
+  
+  // C/C++
+  '.c': 'c',
+  '.cpp': 'cpp',
+  '.cc': 'cpp',
+  '.cxx': 'cpp',
+  '.h': 'c',
+  '.hpp': 'cpp',
+  
+  // Go
+  '.go': 'go',
+  
+  // Rust
+  '.rs': 'rust',
+  
+  // Web
+  '.html': 'html',
+  '.htm': 'html',
+  '.css': 'css',
+  '.scss': 'css',
+  '.sass': 'css',
+  
+  // SQL
+  '.sql': 'sql',
+  
+  // Other
+  '.json': 'json',
+  '.xml': 'xml',
+  '.yaml': 'yaml',
+  '.yml': 'yaml',
+  '.md': 'markdown',
+  '.sh': 'bash',
+  '.bash': 'bash',
+  '.zsh': 'bash',
+  '.ps1': 'powershell',
+  '.php': 'php',
+  '.rb': 'ruby',
+  '.swift': 'swift',
+  '.kt': 'kotlin',
+  '.scala': 'scala',
+  '.r': 'r',
+  '.R': 'r',
+  '.m': 'matlab',
+  '.cs': 'csharp',
+  '.vb': 'vb',
+  '.pl': 'perl',
+  '.lua': 'lua',
+  '.dart': 'dart',
+};
+
+/**
+ * Detect language from file extension
+ */
+export function detectLanguageFromFile(filename: string): string {
+  const ext = filename.substring(filename.lastIndexOf('.')).toLowerCase();
+  return extensionToLanguage[ext] || 'text';
+}
+
 // Simple language detection based on code patterns
 export function detectLanguage(code: string): string {
   if (!code || code.trim().length === 0) {

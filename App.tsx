@@ -20,7 +20,7 @@ export default function App() {
     <ThemeProvider>
       <AnalysisProvider>
         <BrowserRouter>
-        <div className="min-h-screen overflow-hidden relative transition-colors duration-300">
+        <div className="min-h-screen overflow-hidden relative transition-colors duration-300 custom-scrollbar">
           {/* Animated gradient background - theme aware */}
           <div className="fixed inset-0 bg-gradient-to-br from-[#0A0F2C] via-[#111A44] to-[#0A0F2C] dark:from-[#0A0F2C] dark:via-[#111A44] dark:to-[#0A0F2C] light:from-[#F0F4F8] light:via-[#E8EDF3] light:to-[#F0F4F8] transition-colors duration-300">
             {/* Animated orbs */}
@@ -46,7 +46,7 @@ export default function App() {
           <div className="flex flex-1 overflow-hidden">
             <Sidebar />
             
-            <main className="flex-1 overflow-y-auto p-6 space-y-6">
+            <main className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
               <Routes>
                 <Route path="/" element={<Navigate to="/home" replace />} />
                 <Route path="/home" element={<HomePage />} />

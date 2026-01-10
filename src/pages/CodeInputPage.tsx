@@ -29,7 +29,9 @@ export function CodeInputPage() {
       
       const response = await fetch(`${API_BASE_URL}/api/analyze`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           code: codeToAnalyze,
           language: language,
@@ -54,10 +56,7 @@ export function CodeInputPage() {
 
       const data = await response.json();
       console.log('[frontend] Analysis complete:', data.traceId);
-      
       setAnalysis(data.traceId, data.results, data.logs);
-      
-      // Navigate to final verdict page
       navigate('/final');
     } catch (error) {
       console.error('[frontend] Analysis error:', error);

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Sparkles, Code2, Brain, Zap } from 'lucide-react';
+import { Code2, Brain, Zap } from 'lucide-react';
 
 export function AnalysisLoader() {
   return (
@@ -142,27 +142,9 @@ export function AnalysisLoader() {
               >
                 Analyzing Code...
               </motion.h3>
-              <p className="text-white/60 text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>
-                Our AI agents are reviewing your code
+              <p className="text-white/60 text-sm font-medium" style={{ fontFamily: 'Inter, sans-serif' }}>
+                Our AI agents are analyzing your code
               </p>
-            </div>
-
-            {/* Progress bar */}
-            <div className="w-64 h-1 rounded-full bg-white/10 overflow-hidden">
-              <motion.div
-                className="h-full rounded-full"
-                style={{
-                  background: 'linear-gradient(90deg, #4DFFFF, #9A4DFF)',
-                }}
-                animate={{
-                  x: ['-100%', '100%'],
-                }}
-                transition={{
-                  duration: 1.5,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }}
-              />
             </div>
           </div>
         </div>

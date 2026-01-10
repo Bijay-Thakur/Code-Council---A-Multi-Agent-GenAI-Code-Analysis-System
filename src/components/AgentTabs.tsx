@@ -47,13 +47,17 @@ export function AgentTabs({ activeTab, onTabChange, isAnalyzing }: AgentTabsProp
         // Debate is handled by DebatePanel component, not AgentOutputCard
         return undefined;
       case 'refined':
-        // New format: finalSummary, old format: final
-        if (results.supervisor) {
-          if ('finalSummary' in results.supervisor) {
-            return results.supervisor.finalSummary;
+        // New format: summary, old format: finalSummary or final
+        const verdict = results.finalVerdict || results.supervisor;
+        if (verdict) {
+          if ('summary' in verdict) {
+            return verdict.summary;
           }
-          if ('final' in results.supervisor) {
-            return (results.supervisor as any).final;
+          if ('finalSummary' in verdict) {
+            return verdict.finalSummary;
+          }
+          if ('final' in verdict) {
+            return (verdict as any).final;
           }
         }
         return undefined;

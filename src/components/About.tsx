@@ -71,7 +71,7 @@ export function About() {
               </div>
               <div className="px-6 py-2 rounded-full backdrop-blur-xl bg-gradient-to-r from-[#4DFFFF]/20 to-[#9A4DFF]/20 border border-white/20">
                 <span className="text-sm text-white/80" style={{ fontFamily: 'Inter, sans-serif', fontWeight: '500' }}>
-                  2025 Edition
+                  2026 Edition
                 </span>
               </div>
             </div>

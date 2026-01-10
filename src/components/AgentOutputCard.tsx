@@ -6,6 +6,7 @@ interface AgentOutputCardProps {
   agentName: string;
   agentColor: string;
   isAnalyzing: boolean;
+  content?: string;
 }
 
 const agentContent: Record<string, { status: string; output: string }> = {
@@ -110,9 +111,10 @@ The refined version is 1000x faster for n=30!`
   }
 };
 
-export function AgentOutputCard({ agentId, agentName, agentColor, isAnalyzing }: AgentOutputCardProps) {
-  const content = agentContent[agentId] || { status: 'waiting', output: 'Waiting for analysis...' };
-  const status = isAnalyzing ? 'running' : content.status;
+export function AgentOutputCard({ agentId, agentName, agentColor, isAnalyzing, content: externalContent }: AgentOutputCardProps) {
+  const defaultContent = agentContent[agentId] || { status: 'waiting', output: 'Waiting for analysis...' };
+  const displayContent = externalContent !== undefined ? externalContent : defaultContent.output;
+  const status = isAnalyzing ? 'running' : (externalContent ? 'completed' : defaultContent.status);
 
   return (
     <motion.div
@@ -202,7 +204,7 @@ export function AgentOutputCard({ agentId, agentName, agentColor, isAnalyzing }:
                 lineHeight: '1.6'
               }}
             >
-              {content.output}
+              {displayContent}
             </pre>
           </div>
         </div>

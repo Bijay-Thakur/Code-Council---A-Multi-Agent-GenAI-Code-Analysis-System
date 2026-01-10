@@ -1,12 +1,15 @@
 import { motion } from 'framer-motion';
-import { AlertTriangle, Info, XCircle } from 'lucide-react';
+import { AlertTriangle, Info, XCircle, AlertCircle } from 'lucide-react';
 
 interface Finding {
-  severity: 'low' | 'medium' | 'high';
+  severity: 'low' | 'medium' | 'high' | 'critical';
   title: string;
-  whyItMatters: string;
-  whereInCode: string;
+  evidence: string;  // New field
+  impact: string;    // New field
   fix: string;
+  // Backward compatibility
+  whyItMatters?: string;
+  whereInCode?: string;
 }
 
 interface FindingsListProps {
@@ -35,6 +38,13 @@ const severityConfig = {
     border: 'rgba(255, 77, 109, 0.3)',
     icon: XCircle,
     label: 'High'
+  },
+  critical: {
+    color: '#DC2626',
+    bg: 'rgba(220, 38, 38, 0.15)',
+    border: 'rgba(220, 38, 38, 0.4)',
+    icon: AlertCircle,
+    label: 'Critical'
   }
 };
 
@@ -44,6 +54,10 @@ export function FindingsList({ findings, className = '' }: FindingsListProps) {
       {findings.map((finding, idx) => {
         const config = severityConfig[finding.severity] || severityConfig.low;
         const Icon = config.icon;
+        
+        // Use new fields if available, fall back to old fields for backward compatibility
+        const evidence = finding.evidence || finding.whereInCode || 'No location specified';
+        const impact = finding.impact || finding.whyItMatters || 'Impact not specified';
         
         return (
           <motion.div
@@ -84,23 +98,23 @@ export function FindingsList({ findings, className = '' }: FindingsListProps) {
                       {config.label}
                     </span>
                   </div>
-                  <p className="text-white/70 text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>
-                    {finding.whyItMatters}
+                  <p className="text-white/70 text-sm mb-2" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    {impact}
                   </p>
                 </div>
               </div>
               
               <div className="space-y-2 mt-4 pt-4 border-t border-white/10">
                 <div>
-                  <span className="text-white/60 text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>
-                    Location: 
+                  <span className="text-white/60 text-sm font-semibold" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    Evidence: 
                   </span>
-                  <span className="text-white/80 text-sm ml-2" style={{ fontFamily: 'Inter, sans-serif' }}>
-                    {finding.whereInCode}
+                  <span className="text-white/80 text-sm ml-2 font-mono" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    {evidence}
                   </span>
                 </div>
                 <div>
-                  <span className="text-white/60 text-sm" style={{ fontFamily: 'Inter, sans-serif' }}>
+                  <span className="text-white/60 text-sm font-semibold" style={{ fontFamily: 'Inter, sans-serif' }}>
                     Fix: 
                   </span>
                   <span className="text-white/80 text-sm ml-2" style={{ fontFamily: 'Inter, sans-serif' }}>

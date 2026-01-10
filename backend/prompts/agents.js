@@ -1,175 +1,321 @@
 /**
  * Prompt templates for agents that enforce JSON output
+ * All prompts follow strict schemas and use the shared system prompt
  */
 
-function explainerPrompt(code, language) {
-  const prompt = `Analyze and explain this ${language} code. You MUST provide CONCRETE, SPECIFIC answers based on the actual code. Do NOT use generic phrases like "processes data" or "implements a solution". 
+import { SHARED_SYSTEM_PROMPT } from '../schemas/agentSchemas.js';
 
-Look at the code and determine:
-1. What specific problem/algorithm it implements (e.g., "sorts an array", "searches for an element", "calculates fibonacci numbers")
-2. What specific inputs it takes (e.g., "an unsorted array of integers", "a string and a pattern", "two numbers")
-3. What specific outputs it produces (e.g., "a sorted array", "the index of the found element", "the nth fibonacci number")
+/**
+ * (2) EXPLAINER AGENT PROMPT
+ * Role: "Explainer Agent (Teaching Mode)"
+ */
+export function explainerPrompt(code, language) {
+  const systemPrompt = "You are Code Council Explainer. Be specific and grounded in the provided code. Mention real identifiers (function names, variables, loops, conditions). You MUST return valid JSON only. Do not include markdown code blocks or headings.";
+  
+  const prompt = `Explain the following ${language} code in a teaching style. You MUST return valid JSON matching the schema below.
 
-Return ONLY valid JSON with no markdown, no code blocks, no ### headings. Use this exact structure:
-
-{
-  "title": "Specific, concrete title (e.g., 'Merge Sort Algorithm' or 'Binary Search Function')",
-  "summary": "2-3 sentence summary that states the SPECIFIC purpose (e.g., 'This code implements the merge sort algorithm to sort an array of numbers in ascending order using a divide-and-conquer approach.')",
-  "whatItDoes": "CONCRETE explanation of what this code accomplishes. Be SPECIFIC. Examples: 'This code sorts an unsorted array of numbers using the merge sort algorithm' or 'This code searches for a target value in a sorted array using binary search' or 'This code calculates the nth Fibonacci number using recursion'. DO NOT say generic things like 'processes data' or 'implements a solution'.",
-  "inputOutput": {
-    "input": "CONCRETE description of inputs. Be SPECIFIC about data types and what is expected. Examples: 'An unsorted array of integers (e.g., [3, 1, 4, 1, 5])' or 'A sorted array of numbers and a target number to search for' or 'A single integer n representing the position in the Fibonacci sequence'. Include parameter names if visible in the code.",
-    "output": "CONCRETE description of outputs. Be SPECIFIC about what is returned. Examples: 'A sorted array of integers in ascending order (e.g., [1, 1, 3, 4, 5])' or 'The index of the target element if found, or -1 if not found' or 'The nth Fibonacci number as an integer'. State the exact return type and format."
-  },
-  "stepByStep": [
-    {"step": 1, "text": "Specific explanation of what happens in the first step of the algorithm/logic"},
-    {"step": 2, "text": "Specific explanation of what happens in the second step"}
-  ],
-  "keyConcepts": [
-    {"name": "Specific concept name from the code", "explanation": "What this concept means in the context of this specific code"}
-  ],
-  "edgeCases": ["Specific edge case 1 (e.g., 'Empty array input')", "Specific edge case 2 (e.g., 'Array with single element')"],
-  "exampleWalkthrough": "Detailed walkthrough with CONCRETE example. Use actual values. Example: 'If we call this function with [3, 1, 4], it first splits into [3] and [1, 4], then sorts [1, 4] to [1, 4], merges [3] with [1, 4] to produce [1, 3, 4]'"
-}
-
-CRITICAL: Analyze the ACTUAL code. If it's a sorting algorithm, say it sorts. If it's a search, say it searches. If it's a calculation, say what it calculates. Be CONCRETE and SPECIFIC, not generic.
-
-Code to analyze:
+Code:
 \`\`\`${language}
 ${code}
 \`\`\`
 
-Return ONLY the JSON object, nothing else.`;
-
-  const systemPrompt = `You are a senior software engineer and expert code explainer. You MUST return valid JSON only. Never use markdown headings like ###. 
-
-CRITICAL INSTRUCTIONS:
-- Analyze the ACTUAL code and provide CONCRETE, SPECIFIC answers
-- DO NOT use generic phrases like "processes data", "implements a solution", "handles input/output"
-- For "whatItDoes": State the SPECIFIC algorithm/problem (e.g., "sorts an array", "searches for element", "calculates fibonacci")
-- For "input": State SPECIFIC data types and examples (e.g., "unsorted array of integers", "string and pattern")
-- For "output": State SPECIFIC return type and format (e.g., "sorted array", "index or -1", "integer result")
-- Be professional but CONCRETE - identify what the code actually does, not generic descriptions
-- Look at function names, variable names, and logic to determine the specific purpose`;
-  return { prompt, systemPrompt };
-}
-
-function bugHunterPrompt(code, language) {
-  const prompt = `Analyze this ${language} code for bugs, vulnerabilities, and issues. Return ONLY valid JSON with no markdown, no code blocks, no ### headings. Use this exact structure:
-
+Return ONLY valid JSON (no markdown, no code blocks, no explanations outside JSON):
 {
-  "overallRisk": "low|medium|high",
-  "bugCount": 0,
-  "statusMessage": "Well done! No bugs found." OR "X bug(s) found that need attention.",
-  "findings": [
+  "overview": "High-level overview referencing actual function names and structures from the code",
+  "purpose": "Specific purpose and goal, what problem this code solves",
+  "keyIdentifiers": ["actual function names", "variable names", "loop counters from the code"],
+  "inputs": [{"name": "parameter name from code", "typeGuess": "type", "notes": "usage"}],
+  "outputs": [{"name": "return/output name from code", "typeGuess": "type", "notes": "what it represents"}],
+  "blockByBlock": [
     {
-      "severity": "low|medium|high",
-      "title": "Issue title",
-      "whyItMatters": "Why this matters",
-      "whereInCode": "Location/line reference",
-      "fix": "How to fix it"
+      "title": "Block title (e.g., 'Function mergeSort declaration', 'While loop for merging')",
+      "whatHappens": "What this block does specifically, referencing actual variables and operations from the code",
+      "whyItMatters": "Why this block is important",
+      "identifiers": ["actual function names", "variable names", "etc. from code"]
     }
   ],
-  "suggestions": ["Suggestion 1", "Suggestion 2"],
-  "quickFixes": ["Quick fix 1", "Quick fix 2"]
-}
-
-IMPORTANT: 
-- Set bugCount to the number of bugs found (0 if no bugs)
-- If bugCount is 0, set statusMessage to "Well done! No bugs found."
-- If bugCount > 0, set statusMessage to "{bugCount} bug(s) found that need attention."
-- Always include suggestions array (even if empty, provide general improvement suggestions)
-- quickFixes should be actionable fixes for the bugs found
-
-Code to analyze:
-\`\`\`${language}
-${code}
-\`\`\`
-
-Return ONLY the JSON object, nothing else.`;
-
-  const systemPrompt = `You are a bug hunter agent. You MUST return valid JSON only. Never use markdown headings like ###. Use plain strings in JSON. Be specific about severity and locations. Always provide bug count and status message. If no bugs found, congratulate the user with "Well done!" message.`;
-  return { prompt, systemPrompt };
-}
-
-function complexityPrompt(code, language) {
-  const prompt = `Analyze the time and space complexity of this ${language} code. Return ONLY valid JSON with no markdown, no code blocks, no ### headings. Use this exact structure:
-
-{
-  "time": "O(n)",
-  "space": "O(1)",
-  "dominantOperations": ["Operation 1", "Operation 2"],
-  "notes": ["Note 1", "Note 2"],
+  "exampleTrace": [
+    {
+      "step": 1,
+      "state": "Variable values at this step (e.g., 'arr=[3,1,4], length=3')",
+      "explanation": "What happens at this step (e.g., 'Function checks if length <= 1, condition is false')"
+    }
+  ],
+  "edgeCases": ["Edge case 1", "Edge case 2"],
   "improvements": ["Improvement 1", "Improvement 2"]
 }
 
-Code to analyze:
+CRITICAL REQUIREMENTS:
+- Must return ONLY valid JSON (no markdown, no code fences, no text outside JSON)
+- Must reference at least 3 real identifiers from the code (function names, variables, loops, conditions)
+- Must include at least 4 blockByBlock items describing different code sections
+- Must include at least 1 edge case and 2 improvements
+- Be specific: reference actual code elements, not generic patterns`;
+
+  return { prompt, systemPrompt };
+}
+
+/**
+ * (3) BUG HUNTER PROMPT
+ * Role: "Bug Hunter Agent (Security + Reliability)"
+ */
+export function bugHunterPrompt(code, language) {
+  const prompt = `Role: "Bug Hunter Agent (Security + Reliability)"
+
+Analyze this ${language} code for bugs, vulnerabilities, security issues, and reliability problems:
+
 \`\`\`${language}
 ${code}
 \`\`\`
 
-Return ONLY the JSON object, nothing else.`;
+Return JSON in this EXACT schema:
+{
+  "summary": "Overall summary of findings (e.g., 'Found 2 critical issues: null pointer dereference and missing input validation')",
+  "findings": [
+    {
+      "severity": "low|medium|high|critical",
+      "title": "Issue title (e.g., 'Null pointer dereference in function processData')",
+      "evidence": "Evidence from code (e.g., 'Line 15: arr[i] accessed without checking if arr is null')",
+      "impact": "Impact if not fixed (e.g., 'Will cause runtime crash if null input provided')",
+      "fix": "How to fix this issue (e.g., 'Add null check: if (arr === null) return;')"
+    }
+  ],
+  "quickWins": [
+    {
+      "title": "Quick fix title",
+      "diffHint": "Hint about what to change (not actual diff, e.g., 'Add validation check before line 10')"
+    }
+  ]
+}
 
-  const systemPrompt = `You are a complexity analyst. You MUST return valid JSON only. Never use markdown headings like ###. Use plain strings in JSON. Provide accurate Big O notation.`;
+CRITICAL: Be specific about locations and evidence. Reference actual line numbers or code constructs when possible.`;
+
+  return { prompt, systemPrompt: SHARED_SYSTEM_PROMPT };
+}
+
+/**
+ * (4) COMPLEXITY PROMPT
+ * Role: "Complexity Analyst Agent"
+ */
+export function complexityPrompt(code, language) {
+  const systemPrompt = "You are Code Council Complexity Analyst. Analyze time and space complexity deterministically. For the same code, always return the same complexity analysis. Be precise and reference actual code constructs.";
+  
+  const prompt = `Analyze the time and space complexity of this ${language} code. Be deterministic - for identical code, you must return identical complexity analysis.
+
+Code:
+\`\`\`${language}
+${code}
+\`\`\`
+
+You MUST return valid JSON only (no markdown, no code fences, no text outside JSON). Use this EXACT schema:
+{
+  "time": {
+    "bigO": "Big O notation (e.g., 'O(n)', 'O(n log n)', 'O(n²)') - be precise and consistent",
+    "reasoning": "Detailed reasoning for this complexity, referencing specific code constructs (loops, recursion depth, operations)"
+  },
+  "space": {
+    "bigO": "Big O notation (e.g., 'O(1)', 'O(n)', 'O(log n)') - be precise and consistent",
+    "reasoning": "Detailed reasoning for this complexity, referencing specific memory usage (call stack, auxiliary arrays, variables)"
+  },
+  "hotspots": [
+    {
+      "where": "Specific location in code (function name, loop, recursive call)",
+      "why": "Why this is a performance hotspot with specific complexity reasoning"
+    }
+  ],
+  "optimizations": [
+    {
+      "title": "Optimization suggestion title",
+      "whatToChange": "Specific code changes to make (be concrete)",
+      "expectedImpact": "Expected complexity improvement (e.g., 'Reduces time from O(n²) to O(n log n)')"
+    }
+  ]
+}
+
+CRITICAL REQUIREMENTS:
+- Must return ONLY valid JSON (no markdown, no code fences, no explanations outside JSON)
+- Complexity must be deterministic - analyze the code structure, count loops/recursions, identify dominant operations
+- Reference actual code constructs (function names, loop counters, data structures)
+- Be precise: O(n log n) is different from O(n), O(n²) is different from O(n log n)`;
+
   return { prompt, systemPrompt };
 }
 
-function debatePrompt(topic, explainerResult, bugHunterResult, complexityResult, round, role) {
-  const priorRounds = round > 1 ? `\n\nPrevious rounds have been conducted. This is round ${round}.` : '';
-  
-  // Extract key points from results for better context
-  const explainerKey = explainerResult?.whatItDoes || explainerResult?.summary || 'Code explanation available';
-  const bugHunterKey = bugHunterResult?.overallRisk ? `Risk: ${bugHunterResult.overallRisk}, ${bugHunterResult.bugCount || 0} bugs found` : 'Bug analysis available';
-  const complexityKey = complexityResult?.time ? `Time: ${complexityResult.time}, Space: ${complexityResult.space}` : 'Complexity analysis available';
-  
-  const stanceMap = {
-    1: 'claim',
-    2: 'rebuttal',
-    3: 'counter',
-    4: 'counter',
-    5: 'counter',
-    6: 'counter'
+/**
+ * (5) DEBATE ORCHESTRATOR PROMPT
+ * Generates a single debate round
+ */
+export function debateRoundPrompt(topic, explainerResult, bugHunterResult, complexityResult, round, speaker, type, priorRounds = []) {
+  const speakerMap = {
+    1: { speaker: 'Explainer', type: 'claim' },
+    2: { speaker: 'BugHunter', type: 'rebuttal' },
+    3: { speaker: 'Complexity', type: 'counter' },
+    4: { speaker: 'Explainer', type: 'response' },
+    5: { speaker: 'BugHunter', type: 'rebuttal' },
+    6: { speaker: 'Complexity', type: 'counter' }
   };
-  const currentStance = stanceMap[round] || 'counter';
+
+  const roundInfo = speakerMap[round] || { speaker, type };
+  const actualSpeaker = roundInfo.speaker || speaker;
+  const actualType = roundInfo.type || type;
+
+  // Build context from prior rounds
+  let priorContext = '';
+  if (priorRounds.length > 0) {
+    priorContext = '\n\nPrior debate rounds:\n' + priorRounds.map(r => 
+      `Round ${r.round} - ${r.speaker} (${r.type}): ${r.claim}\nEvidence: ${r.evidence.join(', ')}\nRebuttals: ${r.rebuttals.join(', ') || 'None'}`
+    ).join('\n\n');
+  }
+
+  // Safely stringify results and extract useful summary even from fallbacks
+  const safeStringify = (obj, maxLength = 400) => {
+    try {
+      if (!obj || typeof obj !== 'object') {
+        return 'No analysis available';
+      }
+      
+      // Try to extract useful info even from fallback/error results
+      let summary = '';
+      if (obj.overview) {
+        summary = `Overview: ${obj.overview}`;
+        if (obj.purpose) summary += ` | Purpose: ${obj.purpose}`;
+      } else if (obj.purpose) {
+        summary = `Purpose: ${obj.purpose}`;
+      } else if (obj.summary) {
+        summary = `Summary: ${obj.summary}`;
+      } else if (obj.whatItDoes) {
+        summary = `What it does: ${obj.whatItDoes}`;
+      } else if (obj.time && typeof obj.time === 'object' && obj.time.bigO) {
+        summary = `Time: ${obj.time.bigO}, Space: ${obj.space?.bigO || 'N/A'}`;
+      } else if (obj.findings && Array.isArray(obj.findings)) {
+        summary = `${obj.findings.length} finding(s) identified`;
+      } else if (obj.title) {
+        summary = `Title: ${obj.title}`;
+      }
+      
+      if (summary) {
+        return summary.length > maxLength ? summary.substring(0, maxLength) + '...' : summary;
+      }
+      
+      // Fallback to JSON stringify
+      const str = JSON.stringify(obj);
+      return str.length > maxLength ? str.substring(0, maxLength) + '...' : str;
+    } catch (e) {
+      return 'Unable to stringify result';
+    }
+  };
+
+  const systemPrompt = "You are Code Council Debate Orchestrator. Simulate a real debate with multiple back-and-forth rounds. Be specific and reference earlier rounds.";
   
-  const prompt = `You are participating in an engaging, professional debate about code quality. Topic: "${topic}"
+  const prompt = `Debate Topic: "${topic}"
 
-Previous agent analyses summary:
-- Explainer: ${explainerKey}
-- BugHunter: ${bugHunterKey}
-- Complexity: ${complexityKey}${priorRounds}
+Simulate at least 5 rounds:
+1) Explainer claim
+2) BugHunter rebuttal
+3) Complexity counter
+4) Explainer response
+5) Judge verdict
 
-Your role: ${role}
-Round: ${round}
-Stance: ${currentStance}
+You are generating Round ${round} as the ${actualSpeaker} agent (${actualType}).
 
-INSTRUCTIONS:
-- Be engaging, conversational, and professional
-- Reference specific findings from other agents
-- Use evidence from the code analysis
-- Make your argument compelling and clear
-- If this is a rebuttal or counter, directly address points made by other agents
-- Be specific about what should be improved and why
-- Write as if you're speaking in a real code review meeting
+Agent analyses summary:
+- Explainer: ${safeStringify(explainerResult)}
+- BugHunter: ${safeStringify(bugHunterResult)}
+- Complexity: ${safeStringify(complexityResult)}${priorContext}
 
-Return ONLY valid JSON with no markdown, no code blocks, no ### headings. Use this exact structure:
-
+You MUST return valid JSON only (no markdown, no code fences, no text outside JSON). Use this EXACT schema:
 {
   "round": ${round},
-  "speaker": "${role}",
-  "stance": "${currentStance}",
-  "text": "Your engaging, professional argument that references specific findings and makes a compelling case",
-  "evidence": ["Specific evidence point 1 from analysis", "Specific evidence point 2 from analysis"]
+  "speaker": "${actualSpeaker}",
+  "type": "${actualType}",
+  "claim": "Your main claim or statement - be specific and reference code details and previous rounds",
+  "evidence": ["Evidence point 1 from agent analysis", "Evidence point 2"],
+  "rebuttals": ["Rebuttal to point from round X (if prior rounds exist)", "Rebuttal to point from round Y"],
+  "concessions": ["Concession you're making about a valid point from previous rounds"],
+  "proposedFixes": ["Specific fix proposal 1", "Specific fix proposal 2", "Specific fix proposal 3"]
 }
 
-Return ONLY the JSON object, nothing else.`;
+CRITICAL REQUIREMENTS:
+- Must return ONLY valid JSON (no markdown, no code fences, no explanations outside JSON)
+- Each round must reference at least one specific point from a previous round (if prior rounds exist)
+- Must include at least 1 concession and 1 rebuttal in this round
+- Must propose at least 3 concrete fixes
+- Make it feel like a REAL debate with back-and-forth engagement
+- Reference actual code elements and findings from the agent analyses`;
 
-  const systemPrompt = `You are a professional debate participant in a code review discussion. You MUST return valid JSON only. Never use markdown headings like ###. Use plain strings in JSON. Be engaging, conversational, and professional. Make strong, evidence-based arguments. Reference specific findings from other agents. Make the debate interesting and informative.`;
   return { prompt, systemPrompt };
 }
 
-function supervisorPrompt(code, language, explainerResult, bugHunterResult, complexityResult, debateResult) {
-  // Safely stringify results, handling circular references and large objects
-  const safeStringify = (obj, maxLength = 800) => {
+/**
+ * (5) DEBATE JUDGE/VERDICT PROMPT
+ * Generates final consensus and verdict
+ */
+export function debateVerdictPrompt(topic, rounds, explainerResult, bugHunterResult, complexityResult) {
+  const safeStringify = (obj, maxLength = 300) => {
+    try {
+      if (!obj || typeof obj !== 'object') {
+        return 'No analysis available';
+      }
+      
+      // Extract useful summary
+      if (obj.overview) return `Overview: ${obj.overview.substring(0, maxLength)}`;
+      if (obj.purpose) return `Purpose: ${obj.purpose.substring(0, maxLength)}`;
+      if (obj.summary) return `Summary: ${obj.summary.substring(0, maxLength)}`;
+      if (obj.findings && Array.isArray(obj.findings)) {
+        return `${obj.findings.length} finding(s): ${obj.summary?.substring(0, maxLength) || 'Analysis available'}`;
+      }
+      if (obj.time && typeof obj.time === 'object' && obj.time.bigO) {
+        return `Time: ${obj.time.bigO}, Space: ${obj.space?.bigO || 'N/A'}`;
+      }
+      
+      const str = JSON.stringify(obj);
+      return str.length > maxLength ? str.substring(0, maxLength) + '...' : str;
+    } catch (e) {
+      return 'Unable to stringify result';
+    }
+  };
+
+  const prompt = `You are the Judge. Review this code debate and determine consensus.
+
+Debate Topic: "${topic}"
+
+All debate rounds:
+${rounds.map(r => `Round ${r.round} - ${r.speaker} (${r.type}): ${r.claim}\nEvidence: ${r.evidence.join(', ')}\nRebuttals: ${r.rebuttals.join(', ') || 'None'}\nConcessions: ${r.concessions.join(', ') || 'None'}`).join('\n\n')}
+
+Agent analyses:
+- Explainer: ${safeStringify(explainerResult)}
+- BugHunter: ${safeStringify(bugHunterResult)}
+- Complexity: ${safeStringify(complexityResult)}
+
+Return JSON in this EXACT schema for consensus:
+{
+  "isProductionReady": true|false,
+  "topPriorities": [
+    {
+      "priority": 1,
+      "item": "Most important action item",
+      "why": "Why this is the top priority"
+    },
+    {
+      "priority": 2,
+      "item": "Second most important action item",
+      "why": "Why this is the second priority"
+    }
+  ],
+  "rationale": "Detailed rationale for the consensus, synthesizing all debate points"
+}
+
+CRITICAL: Synthesize all arguments. Consider what was debated. Provide prioritized action items.`;
+
+  return { prompt, systemPrompt: SHARED_SYSTEM_PROMPT };
+}
+
+/**
+ * (6) FINAL VERDICT (SUPERVISOR) PROMPT
+ * Role: "Supervisor Agent"
+ */
+export function supervisorPrompt(code, language, explainerResult, bugHunterResult, complexityResult, debateResult) {
+  const safeStringify = (obj, maxLength = 500) => {
     try {
       const str = JSON.stringify(obj);
       return str.length > maxLength ? str.substring(0, maxLength) + '...' : str;
@@ -177,19 +323,10 @@ function supervisorPrompt(code, language, explainerResult, bugHunterResult, comp
       return 'Unable to stringify result';
     }
   };
-  
-  const prompt = `Synthesize a final verdict from all agent analyses. Return ONLY valid JSON with no markdown, no code blocks, no ### headings. Use this exact structure:
 
-{
-  "finalSummary": "Comprehensive summary",
-  "actionItems": ["Action 1", "Action 2"],
-  "riskLevel": "low|medium|high",
-  "optimizedCode": {
-    "language": "${language}",
-    "code": "Complete optimized code here (same language, improved)",
-    "whyBetter": ["Reason 1", "Reason 2"]
-  }
-}
+  const prompt = `Role: "Supervisor Agent"
+
+Synthesize a final verdict from all agent analyses. Generate an optimized version of the code.
 
 Original code:
 \`\`\`${language}
@@ -202,15 +339,44 @@ Agent analyses:
 - Complexity: ${safeStringify(complexityResult)}
 - Debate: ${safeStringify(debateResult)}
 
-IMPORTANT: The optimizedCode.code must be complete, runnable ${language} code that improves the original. Include all necessary imports, fix bugs, add validation, optimize performance.
-
-Return ONLY the JSON object, nothing else.`;
-
-  const systemPrompt = `You are a supervisor agent. You MUST return valid JSON only. Never use markdown headings like ###. Use plain strings in JSON. Generate complete, runnable optimized code.`;
-  return { prompt, systemPrompt };
+Return JSON in this EXACT schema:
+{
+  "summary": "Executive summary synthesizing all analyses (2-3 sentences)",
+  "riskLevel": "low|medium|high",
+  "prioritizedActions": [
+    {
+      "priority": 1,
+      "action": "Most important action to take",
+      "why": "Why this action is critical"
+    },
+    {
+      "priority": 2,
+      "action": "Second most important action",
+      "why": "Why this action matters"
+    }
+  ],
+  "optimizedCode": {
+    "language": "${language}",
+    "code": "Complete optimized code here. Must be runnable. Include all imports, fixes for bugs identified, performance optimizations, input validation, error handling. This should be a complete, production-ready version."
+  },
+  "notes": ["Note 1 about the optimization", "Note 2 about improvements made"]
 }
 
-function orchestratorPrompt(code, language) {
+CRITICAL: 
+- The optimizedCode.code must be complete, runnable ${language} code
+- Fix all bugs identified by BugHunter
+- Apply performance optimizations suggested by Complexity
+- Add missing imports, validation, error handling
+- Keep the same language as input
+- Make it production-ready`;
+
+  return { prompt, systemPrompt: SHARED_SYSTEM_PROMPT };
+}
+
+/**
+ * Orchestrator prompt (optional, for planning)
+ */
+export function orchestratorPrompt(code, language) {
   const prompt = `Create an analysis plan for this ${language} code. Return ONLY valid JSON with no markdown, no code blocks, no ### headings. Use this exact structure:
 
 {
@@ -225,50 +391,42 @@ ${code}
 
 Return ONLY the JSON object, nothing else.`;
 
-  const systemPrompt = `You are an orchestrator agent. You MUST return valid JSON only. Never use markdown headings like ###. Use plain strings in JSON.`;
+  const systemPrompt = SHARED_SYSTEM_PROMPT;
   return { prompt, systemPrompt };
 }
 
 /**
- * Extract JSON from response, handling code blocks and fallbacks
+ * Extract JSON from response (legacy function for backward compatibility)
  */
-function extractJSON(response) {
+export function extractJSON(response) {
   if (!response) return null;
   
   // Try direct parse
   try {
     return JSON.parse(response);
   } catch (e) {
-    // Try extracting from code blocks
-    const jsonMatch = response.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
-    if (jsonMatch) {
-      try {
-        return JSON.parse(jsonMatch[1]);
-      } catch (e2) {
-        // Continue to fallback
-      }
+    // Continue to extraction
+  }
+  
+  // Try extracting from code blocks
+  const jsonMatch = response.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+  if (jsonMatch) {
+    try {
+      return JSON.parse(jsonMatch[1]);
+    } catch (e2) {
+      // Continue
     }
-    
-    // Try finding JSON object in text
-    const braceMatch = response.match(/\{[\s\S]*\}/);
-    if (braceMatch) {
-      try {
-        return JSON.parse(braceMatch[0]);
-      } catch (e3) {
-        // Continue to fallback
-      }
+  }
+  
+  // Try finding JSON object in text
+  const braceMatch = response.match(/\{[\s\S]*\}/);
+  if (braceMatch) {
+    try {
+      return JSON.parse(braceMatch[0]);
+    } catch (e3) {
+      // Continue
     }
   }
   
   return null;
 }
-
-export {
-  explainerPrompt,
-  bugHunterPrompt,
-  complexityPrompt,
-  debatePrompt,
-  supervisorPrompt,
-  orchestratorPrompt,
-  extractJSON
-};

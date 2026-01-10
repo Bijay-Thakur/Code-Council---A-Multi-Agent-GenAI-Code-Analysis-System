@@ -1,34 +1,49 @@
 import { motion } from 'framer-motion';
 import { Terminal, CheckCircle2, AlertTriangle, Info } from 'lucide-react';
 
-const logs = [
-  { time: '14:23:45', type: 'success', message: 'Code analysis completed successfully' },
-  { time: '14:23:42', type: 'info', message: 'Explainer agent finished analysis' },
-  { time: '14:23:40', type: 'info', message: 'Bug Hunter agent finished analysis' },
-  { time: '14:23:38', type: 'info', message: 'Complexity agent finished analysis' },
-  { time: '14:23:35', type: 'warning', message: 'Performance issue detected in recursive function' },
-  { time: '14:23:33', type: 'info', message: 'Debate round 5 completed' },
-  { time: '14:23:30', type: 'info', message: 'Debate round 4 completed' },
-  { time: '14:23:27', type: 'info', message: 'Debate round 3 completed' },
-  { time: '14:23:25', type: 'info', message: 'Debate round 2 completed' },
-  { time: '14:23:22', type: 'info', message: 'Debate round 1 completed' },
-  { time: '14:23:20', type: 'info', message: 'Multi-agent analysis started' },
-  { time: '14:23:18', type: 'success', message: 'Code input received: 7 lines of JavaScript' },
+interface Log {
+  ts: string;
+  level: 'info' | 'warn' | 'error';
+  message: string;
+}
+
+interface SystemLogsProps {
+  logs?: Log[];
+}
+
+const defaultLogs: Log[] = [
+  { ts: new Date().toISOString(), level: 'info', message: 'No logs available. Run code analysis first.' }
 ];
 
 const logIcons = {
   success: CheckCircle2,
   warning: AlertTriangle,
   info: Info,
+  error: AlertTriangle,
+  warn: AlertTriangle,
 };
 
 const logColors = {
   success: '#6BCF7F',
   warning: '#FFD93D',
   info: '#4DFFFF',
+  error: '#FF4D6D',
+  warn: '#FFD93D',
 };
 
-export function SystemLogs() {
+export function SystemLogs({ logs = defaultLogs }: SystemLogsProps) {
+  const displayLogs = logs.length > 0 ? logs : defaultLogs;
+  
+  const formatTime = (isoString: string) => {
+    const date = new Date(isoString);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  };
+  
+  const getLogType = (level: string) => {
+    if (level === 'error') return 'error';
+    if (level === 'warn') return 'warning';
+    return 'info';
+  };
   return (
     <div className="relative">
       <div className="absolute inset-0 backdrop-blur-2xl bg-white/[0.03] rounded-3xl border border-white/10" />
@@ -45,10 +60,11 @@ export function SystemLogs() {
         </div>
 
         {/* Logs container */}
-        <div className="space-y-2">
-          {logs.map((log, idx) => {
-            const Icon = logIcons[log.type as keyof typeof logIcons];
-            const color = logColors[log.type as keyof typeof logColors];
+        <div className="space-y-2 max-h-[600px] overflow-y-auto">
+          {displayLogs.map((log, idx) => {
+            const logType = getLogType(log.level);
+            const Icon = logIcons[logType as keyof typeof logIcons];
+            const color = logColors[logType as keyof typeof logColors];
             
             return (
               <motion.div
@@ -68,10 +84,10 @@ export function SystemLogs() {
 
                 {/* Time */}
                 <span 
-                  className="text-sm text-white/40 font-mono w-20"
+                  className="text-sm text-white/40 font-mono w-24"
                   style={{ fontFamily: 'JetBrains Mono, monospace' }}
                 >
-                  {log.time}
+                  {formatTime(log.ts)}
                 </span>
 
                 {/* Message */}

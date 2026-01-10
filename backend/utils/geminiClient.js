@@ -26,18 +26,68 @@ export async function generateGeminiResponse(modelName, prompt, systemPrompt = n
   }
 
   try {
-    const model = gemini.getGenerativeModel({ model: modelName });
+    // Try the requested model first
+    let model;
+    try {
+      model = gemini.getGenerativeModel({ 
+        model: modelName,
+        generationConfig: {
+          temperature: 0.1,
+        }
+      });
+    } catch (modelError) {
+      console.warn(`[backend] Model ${modelName} not available, trying fallback models...`);
+      // Try common model names as fallback
+      const fallbackModels = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
+      let modelFound = false;
+      
+      for (const fallbackModel of fallbackModels) {
+        if (fallbackModel === modelName) continue; // Skip if already tried
+        try {
+          model = gemini.getGenerativeModel({ 
+            model: fallbackModel,
+            generationConfig: { temperature: 0.1 }
+          });
+          console.log(`[backend] Using fallback model: ${fallbackModel}`);
+          modelFound = true;
+          break;
+        } catch (e) {
+          // Continue to next fallback
+        }
+      }
+      
+      if (!modelFound) {
+        throw new Error(`No valid Gemini model found. Tried: ${modelName}, ${fallbackModels.join(', ')}`);
+      }
+    }
     
     let fullPrompt = prompt;
     if (systemPrompt) {
       fullPrompt = `${systemPrompt}\n\n${prompt}`;
     }
 
+    // Ensure prompt explicitly requests JSON
+    if (!fullPrompt.includes('Return ONLY valid JSON') && !fullPrompt.includes('Return JSON') && !fullPrompt.includes('<json>')) {
+      fullPrompt = fullPrompt + '\n\nIMPORTANT: You MUST return ONLY valid JSON. Do not include any markdown code blocks, no ```json tags, just the raw JSON object.';
+    }
+
     const result = await model.generateContent(fullPrompt);
     const response = await result.response;
-    return response.text();
+    const text = response.text();
+    
+    // Log first 200 chars for debugging
+    console.log(`[backend] Gemini response (${text.length} chars): ${text.substring(0, 200)}...`);
+    
+    return text;
   } catch (error) {
     console.error('[backend] Gemini API error:', error);
+    console.error('[backend] Gemini error details:', error.message);
+    if (error.message) {
+      console.error('[backend] Error message:', error.message);
+    }
+    if (error.stack) {
+      console.error('[backend] Error stack:', error.stack.substring(0, 500));
+    }
     return null;
   }
 }

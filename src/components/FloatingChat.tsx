@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, X, Send, Mic } from 'lucide-react';
 import { API_BASE_URL } from '../config/api';
+import { useAnalysis } from '../contexts/AnalysisContext';
 
 interface ChatMessage {
   id: string;
@@ -11,12 +12,15 @@ interface ChatMessage {
 }
 
 export function FloatingChat() {
+  const { code, results } = useAnalysis();
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome-1',
-      text: "Hello! I'm your Code Council assistant. I can help you understand the multi-agent analysis, explain results, or answer questions about your code.",
+      text: results && code ? 
+        "Hello! I can help you understand the code analysis results, answer questions about your code, explain findings, or discuss the debate. What would you like to know?" :
+        "Hello! I'm your Code Council assistant. I can help you understand the multi-agent analysis, explain results, or answer questions about your code.",
       isBot: true,
       timestamp: new Date(),
     }
@@ -52,6 +56,38 @@ export function FloatingChat() {
     setIsTyping(true);
 
     try {
+      // Prepare context from analysis results
+      const context = {
+        hasCode: !!code && code.trim().length > 0,
+        hasAnalysis: !!results,
+        code: code ? code.substring(0, 2000) : null, // Limit code length for context
+        explainer: results?.explainer ? {
+          overview: results.explainer.overview,
+          purpose: results.explainer.purpose,
+          keyIdentifiers: results.explainer.keyIdentifiers || []
+        } : null,
+        bugHunter: results?.bugHunter ? {
+          summary: results.bugHunter.summary,
+          findingsCount: results.bugHunter.findings?.length || 0,
+          findings: results.bugHunter.findings?.slice(0, 5) || [] // Limit to first 5 findings
+        } : null,
+        complexity: results?.complexity ? {
+          timeComplexity: results.complexity.time?.bigO,
+          spaceComplexity: results.complexity.space?.bigO,
+          timeReasoning: results.complexity.time?.reasoning
+        } : null,
+        debate: results?.debate ? {
+          topic: results.debate.topic,
+          roundsCount: results.debate.rounds?.length || 0,
+          consensus: results.debate.consensus
+        } : null,
+        finalVerdict: results?.finalVerdict ? {
+          summary: results.finalVerdict.summary,
+          riskLevel: results.finalVerdict.riskLevel,
+          actionItems: results.finalVerdict.prioritizedActions?.slice(0, 5) || []
+        } : null
+      };
+
       const response = await fetch(`${API_BASE_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -63,6 +99,7 @@ export function FloatingChat() {
               role: msg.isBot ? 'assistant' : 'user',
               content: msg.text,
             })),
+          context: context, // Include analysis context
         }),
       });
 
