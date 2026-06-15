@@ -36,17 +36,18 @@ export function AgentTabs({ activeTab, onTabChange, isAnalyzing }: AgentTabsProp
           return (results.bugHunter as any).text;
         }
         return undefined; // New format is handled by BugHunterAgentPage
-      case 'complexity':
+      case 'complexity': {
         // New format: structured, old format: text
         const complexity = results.complexity;
         if (complexity && 'text' in complexity) {
           return `Time Complexity: ${complexity.time}\nSpace Complexity: ${complexity.space}\n\n${complexity.text}`;
         }
         return undefined; // New format is handled by ComplexityAgentPage
+      }
       case 'debate':
         // Debate is handled by DebatePanel component, not AgentOutputCard
         return undefined;
-      case 'refined':
+      case 'refined': {
         // New format: summary, old format: finalSummary or final
         const verdict = results.finalVerdict || results.supervisor;
         if (verdict) {
@@ -61,6 +62,7 @@ export function AgentTabs({ activeTab, onTabChange, isAnalyzing }: AgentTabsProp
           }
         }
         return undefined;
+      }
       default:
         return undefined;
     }
